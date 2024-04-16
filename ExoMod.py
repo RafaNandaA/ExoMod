@@ -127,6 +127,7 @@ def Fitting(data_time, data_flx, visualize=True, errordisplay=False):
             plt.ylabel('normalized mag')
             plt.gca().invert_yaxis()
             plt.show()
+    return x + data_time[0] + center, y + base
 def Lightcurve_Stacking(timedata, fluxdata, visualize=False):
     '''
     This function is used for multiple light curves Stacking.
@@ -150,3 +151,15 @@ def Lightcurve_Stacking(timedata, fluxdata, visualize=False):
         plt.gca().invert_yaxis()
         plt.show()
     return timeall, fluxall
+#Additional Feature
+def residual(JD_all, mag_all, timemodel, magmodel):
+    x,y=timemodel, magmodel
+    mag_model=np.interp(JD_all,x,y)
+    plt.figure(figsize=(16, 5))
+    plt.scatter(np.array(JD_all),np.array(mag_all)-mag_model)
+    plt.axhline(y=0, color='red', label='Model')
+    plt.xlabel('time (days)')
+    plt.ylabel('Residual mag')
+    plt.legend()
+    plt.gca().invert_yaxis()
+    plt.show()
