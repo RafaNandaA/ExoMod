@@ -36,8 +36,13 @@ def model(ratio,impact,t_transit):
         flux_points2.append(uncovered_area(a,b,R1,(a1+v*time_sample[i]),b1+(impact*R1),R2))
     flux_points2=-2.5*np.log10(np.array(flux_points2)/max(flux_points2))
     return normalized_time, flux_points2
-#
+#Fitting Function
 def Fitting(data_time, data_flx, visualize=True, errordisplay=False):
+    '''
+    This function is used for light curve fitting.
+    The input should be a time data (in days unit) for the first argument, and magnitude for the second argument
+    User can choose to display error or visualize the plot using argument True or False
+    '''
     def Rsquare(params):
         init_ratio, init_impact, init_transit, init_center, init_base = params
         x, y = model(init_ratio, init_impact, init_transit)
@@ -123,6 +128,11 @@ def Fitting(data_time, data_flx, visualize=True, errordisplay=False):
             plt.gca().invert_yaxis()
             plt.show()
 def Lightcurve_Stacking(timedata, fluxdata, visualize=False):
+    '''
+    This function is used for multiple light curves Stacking.
+    The data is a list consisting of another list of data, each for the time and magnitude
+    User can choose to visualize the stacked data using argument True or False
+    '''
     timeall=[]
     fluxall=[]
     for i in range(len(timedata)):
@@ -139,3 +149,4 @@ def Lightcurve_Stacking(timedata, fluxdata, visualize=False):
         plt.scatter(timeall, fluxall)
         plt.gca().invert_yaxis()
         plt.show()
+    return timeall, fluxall
