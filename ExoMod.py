@@ -217,10 +217,36 @@ def Lightcurve_Stacking(timedata, fluxdata, visualize=False):
     The data is a list consisting of another list of data, each for the time and magnitude
     User can choose to visualize the stacked data using argument True or False
     '''
+    def arrange(data_time, data_flx):
+        def Rsquare(params):
+            init_ratio, init_impact, init_transit, init_center, init_base = params
+            x, y = model(init_ratio, init_impact, init_transit)
+            center = init_center
+            base = init_base
+            yfit = np.interp(data_time, x + data_time[0] + center, y + base)
+            y_mean = np.mean(data_flx)
+            SST = np.sum((data_flx - y_mean)**2)
+            SSR = np.sum((yfit - data_flx)**2)
+            R_squared = (SST - SSR) / SST
+            return -R_squared  # Negative to maximize R_squared
+
+        bounds = [(0, 1), (0, 1), (0, 1), (0, (max(data_time)-min(data_time))), (min(data_flx), max(data_flx))]  # Define bounds for each parameter
+
+        # Perform global optimization using Differential Evolution
+        result = differential_evolution(Rsquare, bounds)
+
+        best_R_squared = -result.fun
+        best_params = result.x
+
+        print("Best R_squared:", best_R_squared)
+        print("Best parameters:", best_params)
+
+        init_ratio, init_impact, init_transit, init_center, init_base = best_params
+        return init_center, init_base
     timeall=[]
     fluxall=[]
     for i in range(len(timedata)):
-        center,base=np.arrange(timedata[i],fluxdata[i])
+        center,base=arrange(timedata[i],fluxdata[i])
         timedata[i]=timedata[i]-(timedata[i][0]+center)
         fluxdata[i]=fluxdata[i]-base
         fluxall.extend(fluxdata[i])
@@ -230,6 +256,7 @@ def Lightcurve_Stacking(timedata, fluxdata, visualize=False):
     timeall = [pair[0] for pair in sorted_pairs]
     fluxall = [pair[1] for pair in sorted_pairs]
     if visualize==True:
+        plt.figure(figsize=(16, 5))
         plt.scatter(timeall, fluxall)
         plt.gca().invert_yaxis()
         plt.show()
@@ -299,33 +326,25 @@ def model_LD_field(ratio,impact,t_transit, u):
         if r <= 1:
             return 10 * (1 - u * (1 - np.sqrt(1 - r**2)))
         else:
-            return 0  # Return 0 for radii larger than 1
+            return 0  
     def generate_field(a, b, r, num_points, u, field_size, a1, b1, ratio):
         r1=r*ratio
-        field = np.zeros((field_size, field_size))  # Initialize field with zeros
-        x = np.linspace(a - r, a + r, field_size)   # x-coordinates of the field grid
-        y = np.linspace(b - r, b + r, field_size)   # y-coordinates of the field grid
-        xx, yy = np.meshgrid(x, y)                  # Meshgrid for the field
+        field = np.zeros((field_size, field_size))  
+        x = np.linspace(a - r, a + r, field_size)   
+        y = np.linspace(b - r, b + r, field_size)   
+        xx, yy = np.meshgrid(x, y)                  
         for i in range(field_size):
             for j in range(field_size):
-                # Calculate radius from center
                 radius = np.sqrt((xx[i, j] - a)**2 + (yy[i, j] - b)**2)
                 out = (xx[i, j] - a1)**2 + (yy[i, j] - b1)**2 -(r1)**2
-                # Calculate density based on radius
                 density = num(radius/r, u)
                 if out<0:
                     density = 0
-                # Assign density to the field grid
                 field[i, j] = density
         return field, xx, yy
     def sum_outside_circle(field, xx, yy, a1, b1, r1):
-        # Calculate the distance of each point from the center (a1, b1)
         distances_squared = (xx - a1)**2 + (yy - b1)**2
-        
-        # Create a mask for points outside the circle
         outside_circle_mask = distances_squared > r1**2
-        
-        # Use the mask to select values outside the circle and sum them
         field_sum = np.sum(field[outside_circle_mask])
         
         return field_sum
@@ -340,8 +359,6 @@ def model_LD_field(ratio,impact,t_transit, u):
     flux_points2=[]
     field, xx, yy=generate_field(0, 0, R1, 100, u, 500, 0, 0, 0)
     for i in range(len(time_sample)):
-        # flux_points2.append(np.sum(generate_field(0, 0, R1, 100, u, 500, a1+v*time_sample[i], b1, ratio)))
         flux_points2.append(sum_outside_circle(field,xx,yy,a1+v*time_sample[i], b1, R2))
     flux_points=-2.5*np.log10(np.array(flux_points2)/max(flux_points2))
-    print(flux_points2)
     return normalized_time, flux_points
