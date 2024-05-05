@@ -246,12 +246,12 @@ def residual(JD_all, mag_all, timemodel, magmodel):
     plt.legend()
     plt.gca().invert_yaxis()
     plt.show()
-def model_LD(ratio,impact,t_transit,u):
+def model_LD_points(ratio,impact,t_transit, u, Swift=False):
     def num(r,u):
         """
         Linear surface brightness function for Limb Darkening Model 
         """
-        return 1*(1 - u*(1-(1-r**2)**0.5))
+        return 10*(1 - u*(1-(1-r**2)**0.5))
     def generate_points(a, b, r, num_points, u):
         points = []
         for i in range(num_points):
@@ -261,13 +261,11 @@ def model_LD(ratio,impact,t_transit,u):
             except:
                 print(r_sampled)
             theta = np.linspace(-np.pi/2, 3*np.pi/2,density)
-            print(theta)
             for j in range(density):
                 x = a + r_sampled * np.cos(theta[j])
                 y = b + r_sampled * np.sin(theta[j])
                 points.append((x, y))
         return points
-    points=generate_points(0,0,100,u)
     def uncovered_area_ld(a2, b2, r2, points):
         count = 0
         for point in points:
@@ -279,12 +277,71 @@ def model_LD(ratio,impact,t_transit,u):
     R2=ratio*R1
     v=2*(R1+R2)/t_transit
     time_span=10*R1/v
-    time_sample=np.linspace(0,time_span,1000)
+    if Swift==True:
+        step=100
+    else:
+        step=1000
+    time_sample=np.linspace(0,time_span,step)
     normalized_time=time_sample-np.median(time_sample)
     a1=-5*R1
     b1=0
     flux_points2=[]
+    points=generate_points(0,0,R1,100,u)
     for i in range(len(time_sample)):
         flux_points2.append(uncovered_area_ld((a1+v*time_sample[i]),b1+(impact*R1),R2,points))
     flux_points2=-2.5*np.log10(np.array(flux_points2)/len(points))
     return normalized_time, flux_points2
+def model_LD_field(ratio,impact,t_transit, u):
+    def num(r, u):
+        """
+        Linear surface brightness function for Limb Darkening Model 
+        """
+        if r <= 1:
+            return 10 * (1 - u * (1 - np.sqrt(1 - r**2)))
+        else:
+            return 0  # Return 0 for radii larger than 1
+    def generate_field(a, b, r, num_points, u, field_size, a1, b1, ratio):
+        r1=r*ratio
+        field = np.zeros((field_size, field_size))  # Initialize field with zeros
+        x = np.linspace(a - r, a + r, field_size)   # x-coordinates of the field grid
+        y = np.linspace(b - r, b + r, field_size)   # y-coordinates of the field grid
+        xx, yy = np.meshgrid(x, y)                  # Meshgrid for the field
+        for i in range(field_size):
+            for j in range(field_size):
+                # Calculate radius from center
+                radius = np.sqrt((xx[i, j] - a)**2 + (yy[i, j] - b)**2)
+                out = (xx[i, j] - a1)**2 + (yy[i, j] - b1)**2 -(r1)**2
+                # Calculate density based on radius
+                density = num(radius/r, u)
+                if out<0:
+                    density = 0
+                # Assign density to the field grid
+                field[i, j] = density
+        return field, xx, yy
+    def sum_outside_circle(field, xx, yy, a1, b1, r1):
+        # Calculate the distance of each point from the center (a1, b1)
+        distances_squared = (xx - a1)**2 + (yy - b1)**2
+        
+        # Create a mask for points outside the circle
+        outside_circle_mask = distances_squared > r1**2
+        
+        # Use the mask to select values outside the circle and sum them
+        field_sum = np.sum(field[outside_circle_mask])
+        
+        return field_sum
+    R1=100
+    R2=ratio*R1
+    v=2*(R1+R2)/t_transit
+    time_span=10*R1/v
+    time_sample=np.linspace(0,time_span,500)
+    normalized_time=time_sample-np.median(time_sample)
+    a1=-5*R1
+    b1=0
+    flux_points2=[]
+    field, xx, yy=generate_field(0, 0, R1, 100, u, 500, 0, 0, 0)
+    for i in range(len(time_sample)):
+        # flux_points2.append(np.sum(generate_field(0, 0, R1, 100, u, 500, a1+v*time_sample[i], b1, ratio)))
+        flux_points2.append(sum_outside_circle(field,xx,yy,a1+v*time_sample[i], b1, R2))
+    flux_points=-2.5*np.log10(np.array(flux_points2)/max(flux_points2))
+    print(flux_points2)
+    return normalized_time, flux_points
