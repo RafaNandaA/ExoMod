@@ -41,6 +41,8 @@ def Fitting(data_time, data_flx, visualize=True, errordisplay=False):
     '''
     This function is used for light curve fitting.
     The input should be a time data (in days unit) for the first argument, and magnitude for the second argument
+    It doesn't matter if the input is in JD or other format, as long as it's unit is day, the fitting process will calculate the center point
+    and the baseline for the magnitude
     User can choose to display error or visualize the plot using argument True or False
     '''
     def Rsquare(params):
