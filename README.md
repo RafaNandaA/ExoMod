@@ -13,3 +13,6 @@ ExoMod is a Python library designed for the processing of Exoplanet Transit Ligh
 ## About
 
 ExoMod is a project developed by the Himastron ITB Research Team. It is currently undergoing rigorous testing and continuous improvement. Additional features and enhancements will be added in future updates.
+
+## More Documentation
+https://doi.org/10.1088/1742-6596/2866/1/012064
