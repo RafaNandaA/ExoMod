@@ -20,29 +20,34 @@ def uncovered_area(a1, b1, r1, a2, b2, r2):
     
     return math.pi * r1**2 -uncovered_area
 #Background simulation to generate the model
-def model(ratio,impact,t_transit):
+def place_in_middle(big_size, small_array):
+    big_array = np.zeros(big_size, dtype=small_array.dtype)
+    start_index = (big_size - len(small_array)) // 2
+    big_array[start_index:start_index + len(small_array)] = small_array
+    return big_array
+def model(ratio,impact,v):
     R1=100
     R2=ratio*R1
-    v=2*(R1+R2)/t_transit
-    time_span=10*R1/v
-    time_sample=np.linspace(0,time_span,1000)
+    v=v*R1
+    time_span=2.5*R1/v
+    time_sample=np.linspace(0,time_span,250)
     normalized_time=time_sample-np.median(time_sample)
     a=0
     b=0
-    a1=-5*R1
-    b1=0
+    a1=-1.25*R1
+    b1=(impact*R1)
     flux_points2=[]
     for i in range(len(time_sample)):
-        flux_points2.append(uncovered_area(a,b,R1,(a1+v*time_sample[i]),b1+(impact*R1),R2))
+        flux_points2.append(uncovered_area(a,b,R1,(a1+v*time_sample[i]),b1,R2))
     flux_points2=-2.5*np.log10(np.array(flux_points2)/max(flux_points2))
-    return normalized_time, flux_points2
+    time_long=np.linspace(-2*time_span,2*time_span,1000)
+    flux_long=place_in_middle(1000, flux_points2)
+    return time_long, flux_long
 #Fitting Function
 def Fitting(data_time, data_flx, visualize=True, errordisplay=False):
     '''
     This function is used for light curve fitting.
     The input should be a time data (in days unit) for the first argument, and magnitude for the second argument
-    It doesn't matter if the input is in JD or other format, as long as it's unit is day, the fitting process will calculate the center point
-    and the baseline for the magnitude
     User can choose to display error or visualize the plot using argument True or False
     '''
     def Rsquare(params):
@@ -57,9 +62,9 @@ def Fitting(data_time, data_flx, visualize=True, errordisplay=False):
         R_squared = (SST - SSR) / SST
         return -R_squared 
     if errordisplay==False: 
-        bounds = [(0, 1), (0, 1), (1e-8, 1), (0, (max(data_time)-min(data_time))), (min(data_flx), max(data_flx))]   
+        bounds = [(0, 0.3), (0, 1), (1, 50), (0, (max(data_time)-min(data_time))), (min(data_flx), max(data_flx))]   
         result = differential_evolution(Rsquare, bounds)
-        result_final = minimize(Rsquare, result.x, method='BFGS')  
+        result_final = minimize(Rsquare, result.x, bounds=bounds, method='BFGS')  
 
         best_R_squared = -result_final.fun 
         best_params = result_final.x
@@ -95,24 +100,26 @@ def Fitting(data_time, data_flx, visualize=True, errordisplay=False):
             SSR = np.sum((yfit - data_flx)**2)
             R_squared = (SST - SSR) / SST
             return -R_squared  
-        bounds = [(0, 1), (0, 1), (1e-8, 1), (0, (max(data_time)-min(data_time))), (min(data_flx), max(data_flx))]   
+        bounds = [(0, 0.3), (0, 1), (1, 50), (0, (max(data_time)-min(data_time))), (min(data_flx), max(data_flx))]    
         result = differential_evolution(Rsquare, bounds)
         result_final = minimize(Rsquare, result.x, method='BFGS') 
         best_R_squared = -result_final.fun 
         best_params = result_final.x
         bootstrap_params = []
-        for _ in range(100):
+        for i in range(10):
             indices = np.random.choice(len(data_time), size=len(data_time), replace=True)
             bootstrap_time = data_time[indices]
             bootstrap_flx = data_flx[indices]
-
-            bootstrap_result = minimize(Rsquare, best_params, method='BFGS', args=(bootstrap_time, bootstrap_flx))
+            print(i, 0)
+            bootstrap_result = differential_evolution(Rsquare, bounds)
             bootstrap_params.append(bootstrap_result.x)
-
+            print(i, 1)
         bootstrap_params = np.array(bootstrap_params)
+        print(bootstrap_params)
         parameter_uncertainties = np.std(bootstrap_params, axis=0)
         
         print("Best parameters:")
+        print("Best R-square= ", best_R_squared)
         print("    ratio =", best_params[0], "±", parameter_uncertainties[0])
         print("    impact param =", best_params[1], "±", parameter_uncertainties[1])
         print("    transit duration =", best_params[2], "±", parameter_uncertainties[2])
@@ -148,7 +155,7 @@ def FittingErr(data_time, data_flx, data_flx_err, visualize=True, errordisplay=F
         R_squared = 1 - (SSR / SST)
         return -R_squared
     if errordisplay==False: 
-        bounds = [(0, 1), (0, 1), (1e-8, 1), (0, (max(data_time)-min(data_time))), (min(data_flx), max(data_flx))]   
+        bounds = [(0, 0.3), (0, 1), (1, 50), (0, (max(data_time)-min(data_time))), (min(data_flx), max(data_flx))]    
         result = differential_evolution(Rsquare, bounds)
         result_final = minimize(Rsquare, result.x, method='BFGS')  
 
@@ -177,7 +184,7 @@ def FittingErr(data_time, data_flx, data_flx_err, visualize=True, errordisplay=F
             SSR = np.sum((yfit - data_flx)**2)
             R_squared = (SST - SSR) / SST
             return -R_squared  
-        bounds = [(0, 1), (0, 1), (1e-8, 1), (0, (max(data_time)-min(data_time))), (min(data_flx), max(data_flx))]   
+        bounds = [(0, 0.3), (0, 1), (1, 50), (0, (max(data_time)-min(data_time))), (min(data_flx), max(data_flx))]    
         result = differential_evolution(Rsquare, bounds)
         result_final = minimize(Rsquare, result.x, method='BFGS') 
         best_R_squared = -result_final.fun 
@@ -232,7 +239,7 @@ def Lightcurve_Stacking(timedata, fluxdata, visualize=False):
             R_squared = (SST - SSR) / SST
             return -R_squared  # Negative to maximize R_squared
 
-        bounds = [(0, 1), (0, 1), (0, 1), (0, (max(data_time)-min(data_time))), (min(data_flx), max(data_flx))]  # Define bounds for each parameter
+        bounds = [(0, 0.3), (0, 1), (1, 50), (0, (max(data_time)-min(data_time))), (min(data_flx), max(data_flx))]     # Define bounds for each parameter
 
         # Perform global optimization using Differential Evolution
         result = differential_evolution(Rsquare, bounds)
@@ -275,7 +282,7 @@ def residual(JD_all, mag_all, timemodel, magmodel):
     plt.legend()
     plt.gca().invert_yaxis()
     plt.show()
-def model_LD_points(ratio,impact,t_transit, u, Swift=False):
+def model_LD_points(ratio,impact,v, u, Swift=True):
     def num(r,u):
         """
         Linear surface brightness function for Limb Darkening Model 
@@ -304,23 +311,25 @@ def model_LD_points(ratio,impact,t_transit, u, Swift=False):
         return count
     R1=100
     R2=ratio*R1
-    v=2*(R1+R2)/t_transit
-    time_span=10*R1/v
+    v=v*R1
+    time_span=2.5*R1/v
     if Swift==True:
-        step=100
+        step=25
     else:
-        step=1000
+        step=250
     time_sample=np.linspace(0,time_span,step)
     normalized_time=time_sample-np.median(time_sample)
-    a1=-5*R1
+    a1=-1.25*R1
     b1=0
     flux_points2=[]
     points=generate_points(0,0,R1,100,u)
     for i in range(len(time_sample)):
         flux_points2.append(uncovered_area_ld((a1+v*time_sample[i]),b1+(impact*R1),R2,points))
     flux_points2=-2.5*np.log10(np.array(flux_points2)/len(points))
-    return normalized_time, flux_points2
-def model_LD_field(ratio,impact,t_transit, u):
+    time_long=np.linspace(-2*time_span,2*time_span,step*4)
+    flux_long=place_in_middle(step*4, flux_points2)
+    return time_long, flux_long
+def model_LD_field(ratio,impact,v, u):
     def num(r, u):
         """
         Linear surface brightness function for Limb Darkening Model 
@@ -338,29 +347,42 @@ def model_LD_field(ratio,impact,t_transit, u):
         for i in range(field_size):
             for j in range(field_size):
                 radius = np.sqrt((xx[i, j] - a)**2 + (yy[i, j] - b)**2)
-                out = (xx[i, j] - a1)**2 + (yy[i, j] - b1)**2 -(r1)**2
                 density = num(radius/r, u)
-                if out<0:
-                    density = 0
                 field[i, j] = density
         return field, xx, yy
-    def sum_outside_circle(field, xx, yy, a1, b1, r1):
-        distances_squared = (xx - a1)**2 + (yy - b1)**2
-        outside_circle_mask = distances_squared > r1**2
-        field_sum = np.sum(field[outside_circle_mask])
+    def sum_inside_circle(field, xx, yy, a1, b1, r1):
+        r1_squared = r1 ** 2
+        x_min, x_max = a1 - r1, a1 + r1
+        y_min, y_max = b1 - r1, b1 + r1
+
+        bounding_box_mask = (xx >= x_min) & (xx <= x_max) & (yy >= y_min) & (yy <= y_max)
+
+        xx_bb = xx[bounding_box_mask]
+        yy_bb = yy[bounding_box_mask]
+        field_bb = field[bounding_box_mask]
+
+        distances_squared = (xx_bb - a1) ** 2 + (yy_bb - b1) ** 2
+        inside_circle_mask = distances_squared <= r1_squared
+
+        inside_circle_sum = np.sum(field_bb[inside_circle_mask])
         
-        return field_sum
+        return inside_circle_sum
     R1=100
     R2=ratio*R1
-    v=2*(R1+R2)/t_transit
-    time_span=10*R1/v
-    time_sample=np.linspace(0,time_span,500)
-    normalized_time=time_sample-np.median(time_sample)
-    a1=-5*R1
+    v=v*R1
+    length=R1*np.sqrt((1+ratio)**2-impact**2)
+    time_span=length/v
+    time_sample=np.linspace(0,time_span,50)
+    numrat=int(10*R1/(length))
+    a1=-length
     b1=0
     flux_points2=[]
-    field, xx, yy=generate_field(0, 0, R1, 100, u, 500, 0, 0, 0)
+    field, xx, yy=generate_field(0, 0, R1, 100, u, 750, 0, 0, 0)
+    total_sum = np.sum(field)
     for i in range(len(time_sample)):
-        flux_points2.append(sum_outside_circle(field,xx,yy,a1+v*time_sample[i], b1, R2))
+        flux_points2.append(total_sum-sum_inside_circle(field,xx,yy,a1+v*time_sample[i], b1+impact*R1, R2))
+    flux_points2=flux_points2+flux_points2[::-1]
     flux_points=-2.5*np.log10(np.array(flux_points2)/max(flux_points2))
-    return normalized_time, flux_points
+    time_long=np.linspace(-(length*numrat/2)/v,(length*numrat/2)/v,numrat*50)
+    flux_long=place_in_middle(numrat*50, flux_points)
+    return time_long, flux_long
